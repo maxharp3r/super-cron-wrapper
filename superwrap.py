@@ -35,7 +35,7 @@ import time
 HTML_TMPL = """<div style="font-family:monospace; font-size:13px;">%s</div>"""
 
 # message to send on successful completion
-STANDARD_MSG_TMPL = """command:
+STANDARD_MSG_TMPL = """%scommand:
 
     %s
 
@@ -78,12 +78,13 @@ class Command:
 
 class Mailer:
     """Send a fancy email message, formatted in html to give us a monospace font"""
-    def __init__(self, smtp_host, from_addr, to_addrs, testing_mode=False):
+    def __init__(self, smtp_host, from_addr, to_addrs, subject_prefix, testing_mode):
         self.smtp_args = {}
         if smtp_host:
             self.smtp_args['host'] = smtp_host
         self.from_addr = from_addr
         self.to_addrs = ",".join(to_addrs)
+        self.subject_prefix = subject_prefix
         self.testing_mode = True if testing_mode is True else False
 
     @staticmethod
@@ -95,7 +96,7 @@ class Mailer:
     def send_email(self, subject, body):
         # see http://docs.python.org/2/library/email-examples.html#id5
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
+        msg['Subject'] = "%s %s" % (self.subject_prefix, subject) if self.subject_prefix else subject
         msg['From'] = self.from_addr
         msg['To'] = self.to_addrs
         msg.attach(MIMEText(body, 'plain'))
@@ -114,19 +115,21 @@ class Mailer:
 def _go(args):
     cmd = Command(args.cmd, args.stdout_path, args.stderr_path)
 
-    mailer = Mailer(args.smtp_host, args.mail_from, args.mail_to, args.testing_email_mode)
+    mailer = Mailer(args.smtp_host, args.mail_from, args.mail_to, args.mail_subject_prefix, args.testing_email_mode)
     hostname = socket.gethostname()
     username = getpass.getuser()
-    info_msg = STANDARD_MSG_TMPL % (args.cmd, cmd.run_time, hostname, username, args.stdout_path, args.stderr_path)
+    desc = "%s\n\n" % args.desc if args.desc else ""
+    info_msg = STANDARD_MSG_TMPL % (desc, args.cmd, cmd.run_time, hostname, username, args.stdout_path,
+                                    args.stderr_path)
 
     if cmd.return_code != 0 or cmd.stderr:
         # error condition
-        subject = "[cron] %s failure" % (args.name)
+        subject = "failure: %s" % (args.name)
         body = "%s\n\nstandard error:\n\n%s" % (info_msg, cmd.stderr)
         mailer.send_email(subject, body)
     elif args.email_on_success:
         # success condition, and we want to be notified
-        subject = "[cron] %s success" % (args.name)
+        subject = "success: %s" % (args.name)
         body = info_msg
         mailer.send_email(subject, body)
 
@@ -137,15 +140,18 @@ if __name__ == '__main__':
 
     # required
     parser.add_argument('-c', '--cmd', required=True, help='The command itself')
+    parser.add_argument('-n', '--name', required=True, help='A name, used to identify this cron job. '
+                                                            'Choose something unique.')
 
     # optional
-    parser.add_argument('-n', '--name', default='unnamed cron job', help='A name, used to identify this cron job. '
-                                                                         'Choose something unique.')
+    parser.add_argument('--desc', help='Some text to describe the purpose of the command being run.')
     parser.add_argument('--stdout-path', help='Filename to store standard out (defaults to tmp file)')
     parser.add_argument('--stderr-path', help='Filename to store standard error (defaults to tmp file)')
-    parser.add_argument('--mail-to', required=False, action='append', help='Send to this address (multiple allowed)')
-    parser.add_argument('--mail-from', required=False, help='Send from this address')
-    parser.add_argument('--smtp-host', required=False, help='SMTP host (e.g., mail.foo.com)')
+    parser.add_argument('--mail-to', action='append', help='Send to this address (multiple allowed)')
+    parser.add_argument('--mail-from', help='Send from this address')
+    parser.add_argument('--mail-subject-prefix', required=False,
+                        help='Add a string to the beginning of the subject line')
+    parser.add_argument('--smtp-host', help='SMTP host (e.g., mail.foo.com)')
     parser.add_argument('--email-on-success', action='store_true',
                         help='If set, we will send an email on successful completion of CMD.')
     parser.add_argument('--suppress-email-on-stderr', action='store_true',
