@@ -159,7 +159,7 @@ if __name__ == '__main__':
         args.mail_to = [os.environ.get('SUPERWRAP_MAIL_TO')]
         if not args.mail_to:
             # check standard crontab env var
-            args.mail_to = [os.environ.get('SUPERWRAP_MAIL_TO')]
+            args.mail_to = [os.environ.get('MAILTO')]
     if not args.mail_from:
         args.mail_from = os.environ.get('SUPERWRAP_MAIL_FROM')
 
