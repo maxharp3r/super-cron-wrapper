@@ -82,12 +82,6 @@ class Mailer:
             self.smtp_args['host'] = smtp_host
         self.from_addr = from_addr
         self.to_addrs = ",".join(to_addrs)
-
-        # debug
-        print "smtp: ", self.smtp_args
-        print "from: ", self.from_addr
-        print "to:   ", self.to_addrs
-
         self.testing_mode = True if testing_mode is True else False
 
     @staticmethod
@@ -167,7 +161,7 @@ if __name__ == '__main__':
             # check standard crontab env var
             args.mail_to = [os.environ.get('SUPERWRAP_MAIL_TO')]
     if not args.mail_from:
-        args.mail_from = [os.environ.get('SUPERWRAP_MAIL_FROM')]
+        args.mail_from = os.environ.get('SUPERWRAP_MAIL_FROM')
 
     # verify our environment
     if not args.smtp_host:
