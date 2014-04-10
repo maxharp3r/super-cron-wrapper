@@ -23,8 +23,10 @@ also see:
 import argparse
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import getpass
 import os
 import smtplib
+import socket
 import tempfile
 import time
 
@@ -113,8 +115,9 @@ def _go(args):
     cmd = Command(args.cmd, args.stdout_path, args.stderr_path)
 
     mailer = Mailer(args.smtp_host, args.mail_from, args.mail_to, args.testing_email_mode)
-    info_msg = STANDARD_MSG_TMPL % (args.cmd, cmd.run_time, os.environ.get('HOST'), os.environ.get('USER'),
-                                    args.stdout_path, args.stderr_path)
+    hostname = socket.gethostname()
+    username = getpass.getuser()
+    info_msg = STANDARD_MSG_TMPL % (args.cmd, cmd.run_time, hostname, username, args.stdout_path, args.stderr_path)
 
     if cmd.return_code != 0 or cmd.stderr:
         # error condition
