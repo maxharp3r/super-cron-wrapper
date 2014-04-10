@@ -76,12 +76,13 @@ class Command:
 
 class Mailer:
     """Send a fancy email message, formatted in html to give us a monospace font"""
-    def __init__(self, smtp_host, from_addr, to_addrs):
+    def __init__(self, smtp_host, from_addr, to_addrs, testing_mode=False):
         self.smtp_args = {}
         if smtp_host:
             self.smtp_args['host'] = smtp_host
         self.from_addr = from_addr
         self.to_addrs = to_addrs
+        self.testing_mode = True if testing_mode is True else False
 
     @staticmethod
     def format_message_as_html(message):
@@ -97,18 +98,21 @@ class Mailer:
         msg['To'] = ",".join(self.to_addrs)
         msg.attach(MIMEText(body, 'plain'))
         msg.attach(MIMEText(Mailer.format_message_as_html(body), 'html'))  # html content should be last
-        try:
-            s = smtplib.SMTP(**self.smtp_args)
-            #s.set_debuglevel(True)
-            s.sendmail(self.from_addr, self.to_addrs, msg.as_string())
-        finally:
-            s.quit()
+        if self.testing_mode:
+            print msg
+        else:
+            try:
+                s = smtplib.SMTP(**self.smtp_args)
+                #s.set_debuglevel(True)
+                s.sendmail(self.from_addr, self.to_addrs, msg.as_string())
+            finally:
+                s.quit()
 
 
 def _go(args):
     cmd = Command(args.cmd, args.stdout_path, args.stderr_path)
 
-    mailer = Mailer(args.smtp_host, args.mail_from, args.mail_to)
+    mailer = Mailer(args.smtp_host, args.mail_from, args.mail_to, args.testing_email_mode)
     info_msg = STANDARD_MSG_TMPL % (args.cmd, cmd.run_time, os.environ.get('HOST'), os.environ.get('USER'),
                                     args.stdout_path, args.stderr_path)
 
@@ -144,6 +148,8 @@ if __name__ == '__main__':
     parser.add_argument('--suppress-email-on-stderr', action='store_true',
                         help='If set, we will not email in the presence of output to stderr '
                              '(only on an error return code).')
+    parser.add_argument('--testing-email-mode', action='store_true',
+                        help='If set, we will just print the email to stdout rather than sending anything.')
     args = parser.parse_args()
 
     # add environment variable configuration
