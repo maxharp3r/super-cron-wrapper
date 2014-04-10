@@ -104,7 +104,7 @@ class Mailer:
             try:
                 s = smtplib.SMTP(**self.smtp_args)
                 #s.set_debuglevel(True)
-                s.sendmail(self.from_addr, self.to_addrs, msg.as_string())
+                s.sendmail(self.from_addr, ", ".join(self.to_addrs), msg.as_string())
             finally:
                 s.quit()
 
