@@ -81,7 +81,13 @@ class Mailer:
         if smtp_host:
             self.smtp_args['host'] = smtp_host
         self.from_addr = from_addr
-        self.to_addrs = to_addrs
+        self.to_addrs = ",".join(to_addrs)
+
+        # debug
+        print "smtp: ", self.smtp_args
+        print "from: ", self.from_addr
+        print "to:   ", self.to_addrs
+
         self.testing_mode = True if testing_mode is True else False
 
     @staticmethod
@@ -95,7 +101,7 @@ class Mailer:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         msg['From'] = self.from_addr
-        msg['To'] = ",".join(self.to_addrs)
+        msg['To'] = self.to_addrs
         msg.attach(MIMEText(body, 'plain'))
         msg.attach(MIMEText(Mailer.format_message_as_html(body), 'html'))  # html content should be last
         if self.testing_mode:
@@ -104,7 +110,7 @@ class Mailer:
             try:
                 s = smtplib.SMTP(**self.smtp_args)
                 #s.set_debuglevel(True)
-                s.sendmail(self.from_addr, ", ".join(self.to_addrs), msg.as_string())
+                s.sendmail(self.from_addr, self.to_addrs, msg.as_string())
             finally:
                 s.quit()
 
