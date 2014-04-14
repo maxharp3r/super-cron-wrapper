@@ -5,8 +5,8 @@
 
 examples:
 
-    ./superwrap.py --name foo --mail-to to@nowhere.com --mail-from from@nowhere.com --email-on-success --testing-email-mode --cmd="ls -l"
-    ./superwrap.py --name foo --mail-to to@nowhere.com --mail-from from@nowhere.com --email-on-success --testing-email-mode --cmd="ls -l asdf"
+    ./superwrap.py --name foo --mail-to to@nowhere.com --mail-from from@nowhere.com --email-on-success --include-stdout-in-email --testing-email-mode --cmd="ls -l"
+    ./superwrap.py --name foo --mail-to to@nowhere.com --mail-from from@nowhere.com --email-on-success --include-stdout-in-email --testing-email-mode --cmd="ls -l asdf"
 
 responds to environment variables (these are overridden by command-line params with the same names):
 
@@ -49,8 +49,18 @@ output written to: %s
 stderr written to: %s
 """
 
+# standard out
+STDOUT_MSG_TMPL = """
+standard out:
+
+%s
+"""
+
+
 # add this information on failure
-ERROR_MSG_TMPL = """return code: %s
+ERROR_MSG_TMPL = """
+return code: %s
+
 standard error:
 
 %s
@@ -132,6 +142,8 @@ def _go(args):
     desc = "%s\n\n" % args.desc if args.desc else ""
     info_msg = STANDARD_MSG_TMPL % (desc, args.cmd, cmd.run_time, hostname, username, args.stdout_path,
                                     args.stderr_path)
+    if args.include_stdout_in_email:
+        info_msg += STDOUT_MSG_TMPL % cmd.stdout[:10000]
     job_name = JOB_NAME_TMPL % (username, hostname, args.name)
 
     if cmd.return_code != 0 or cmd.stderr:
@@ -167,6 +179,8 @@ if __name__ == '__main__':
     parser.add_argument('--smtp-host', help='SMTP host (e.g., mail.foo.com)')
     parser.add_argument('--email-on-success', action='store_true',
                         help='If set, we will send an email on successful completion of CMD.')
+    parser.add_argument('--include-stdout-in-email', action='store_true',
+                        help='If set, we will include stdout in the email message.')
     parser.add_argument('--suppress-email-on-stderr', action='store_true',
                         help='If set, we will not email in the presence of output to stderr '
                              '(only on an error return code).')
