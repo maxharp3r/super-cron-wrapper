@@ -5,8 +5,8 @@
 
 examples:
 
-    superwrap.py -h
-    superwrap.py --name foo --cmd='ls -l'
+    ./superwrap.py --name foo --mail-to to@nowhere.com --mail-from from@nowhere.com --email-on-success --testing-email-mode --cmd="ls -l"
+    ./superwrap.py --name foo --mail-to to@nowhere.com --mail-from from@nowhere.com --email-on-success --testing-email-mode --cmd="ls -l asdf"
 
 responds to environment variables (these are overridden by command-line params with the same names):
 
@@ -34,7 +34,10 @@ import time
 # mimic gmail's monospace formatting
 HTML_TMPL = """<div style="font-family:monospace; font-size:13px;">%s</div>"""
 
-# message to send on successful completion
+# include this job name in the subject line
+JOB_NAME_TMPL = "%s@%s %s"
+
+# message to include in all emails
 STANDARD_MSG_TMPL = """%scommand:
 
     %s
@@ -44,6 +47,13 @@ host: %s
 user: %s
 output written to: %s
 stderr written to: %s
+"""
+
+# add this information on failure
+ERROR_MSG_TMPL = """return code: %s
+standard error:
+
+%s
 """
 
 
@@ -113,6 +123,7 @@ class Mailer:
 
 
 def _go(args):
+    """Run the command, send an email if warranted."""
     cmd = Command(args.cmd, args.stdout_path, args.stderr_path)
 
     mailer = Mailer(args.smtp_host, args.mail_from, args.mail_to, args.mail_subject_prefix, args.testing_email_mode)
@@ -121,15 +132,17 @@ def _go(args):
     desc = "%s\n\n" % args.desc if args.desc else ""
     info_msg = STANDARD_MSG_TMPL % (desc, args.cmd, cmd.run_time, hostname, username, args.stdout_path,
                                     args.stderr_path)
+    job_name = JOB_NAME_TMPL % (username, hostname, args.name)
 
     if cmd.return_code != 0 or cmd.stderr:
         # error condition
-        subject = "failure: %s" % (args.name)
-        body = "%s\n\nstandard error:\n\n%s" % (info_msg, cmd.stderr)
+        error_msg = ERROR_MSG_TMPL % (cmd.return_code, cmd.stderr[:10000])
+        subject = "failure: %s" % job_name
+        body = info_msg + error_msg
         mailer.send_email(subject, body)
     elif args.email_on_success:
         # success condition, and we want to be notified
-        subject = "success: %s" % (args.name)
+        subject = "success: %s" % job_name
         body = info_msg
         mailer.send_email(subject, body)
 
@@ -173,7 +186,7 @@ if __name__ == '__main__':
         args.mail_from = os.environ.get('SUPERWRAP_MAIL_FROM')
 
     # verify our environment
-    if not args.smtp_host:
+    if not args.smtp_host and not args.testing_email_mode:
         raise ValueError("Requires --smtp-host or environment variable SUPERWRAP_SMTP_HOST")
 
     if not args.mail_to:
