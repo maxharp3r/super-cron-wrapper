@@ -130,15 +130,17 @@ def _truncate(str, maxlen=10000):
     """truncate a string to at most maxlen bytes"""
     return str \
         if len(str) <= maxlen \
-        else str[:maxlen] + "... (truncated, showing %d of %d characters)" % (maxlen, len(str))
+        else str[:maxlen] + "...\n(truncated, showing %d of %d characters)" % (maxlen, len(str))
 
 
 def _go(args):
     """Run the command, send an email if warranted."""
     cmd = Command(args.cmd, args.stdout_path, args.stderr_path)
-    succeeded = False if (cmd.return_code != 0 or cmd.stderr) else True
-    mailer = Mailer(args.smtp_host, args.mail_from, args.mail_to, args.mail_subject_prefix, args.testing_email_mode)
+    succeeded = False \
+        if (cmd.return_code != 0 or (not args.ignore_stderr and cmd.stderr)) \
+        else True
 
+    mailer = Mailer(args.smtp_host, args.mail_from, args.mail_to, args.mail_subject_prefix, args.testing_email_mode)
     cmd_info = {
         "result": "success" if succeeded else "failure",
         "name": args.name,
@@ -180,13 +182,15 @@ if __name__ == '__main__':
     parser.add_argument('--mail-subject-prefix', required=False,
                         help='Add a string to the beginning of the subject line')
     parser.add_argument('--smtp-host', help='SMTP host (e.g., mail.foo.com)')
+
+    # optional flags to control behavior
     parser.add_argument('--email-on-success', action='store_true',
                         help='If set, we will send an email on successful completion of CMD.')
     parser.add_argument('--include-stdout-in-email', action='store_true',
                         help='If set, we will include stdout in the email message.')
-    parser.add_argument('--suppress-email-on-stderr', action='store_true',
-                        help='If set, we will not email in the presence of output to stderr '
-                             '(only on an error return code).')
+    parser.add_argument('--ignore-stderr', action='store_true',
+                        help='If set, we will only compute success/failur based on the return code of CMD, and will '
+                             'ignore output to stderr.')
     parser.add_argument('--testing-email-mode', action='store_true',
                         help='If set, we will just print the email to stdout rather than sending anything.')
     args = parser.parse_args()
