@@ -34,33 +34,27 @@ import time
 # mimic gmail's monospace formatting
 HTML_TMPL = """<div style="font-family:monospace; font-size:13px;">%s</div>"""
 
-# include this job name in the subject line
-JOB_NAME_TMPL = "%s@%s %s"
+SUBJECT_LINE_TMPL = "%(result)s: %(username)s@%(hostname)s %(name)s"
 
-# message to include in all emails
-STANDARD_MSG_TMPL = """%scommand:
+STANDARD_MSG_TMPL = """%(desc)scommand:
 
-    %s
+    %(cmd)s
 
-completed in %.2f seconds
-host: %s
-user: %s
-output written to: %s
-stderr written to: %s
+completed in: %(run_time).2f seconds
+return code: %(return_code)s
+host: %(hostname)s
+user: %(username)s
+output written to: %(outfile)s (%(outfile_size)d bytes)
+stderr written to: %(errfile)s (%(errfile_size)d bytes)
 """
 
-# standard out
 STDOUT_MSG_TMPL = """
 standard out:
 
 %s
 """
 
-
-# add this information on failure
 ERROR_MSG_TMPL = """
-return code: %s
-
 standard error:
 
 %s
@@ -132,31 +126,40 @@ class Mailer:
                 s.quit()
 
 
+def _truncate(str, maxlen=10000):
+    """truncate a string to at most maxlen bytes"""
+    return str \
+        if len(str) <= maxlen \
+        else str[:maxlen] + "... (truncated, showing %d of %d characters)" % (maxlen, len(str))
+
+
 def _go(args):
     """Run the command, send an email if warranted."""
     cmd = Command(args.cmd, args.stdout_path, args.stderr_path)
-
+    succeeded = False if (cmd.return_code != 0 or cmd.stderr) else True
     mailer = Mailer(args.smtp_host, args.mail_from, args.mail_to, args.mail_subject_prefix, args.testing_email_mode)
-    hostname = socket.gethostname()
-    username = getpass.getuser()
-    desc = "%s\n\n" % args.desc if args.desc else ""
-    info_msg = STANDARD_MSG_TMPL % (desc, args.cmd, cmd.run_time, hostname, username, args.stdout_path,
-                                    args.stderr_path)
-    if args.include_stdout_in_email:
-        info_msg += STDOUT_MSG_TMPL % cmd.stdout[:10000]
-    job_name = JOB_NAME_TMPL % (username, hostname, args.name)
 
-    if cmd.return_code != 0 or cmd.stderr:
-        # error condition
-        error_msg = ERROR_MSG_TMPL % (cmd.return_code, cmd.stderr[:10000])
-        subject = "failure: %s" % job_name
-        body = info_msg + error_msg
-        mailer.send_email(subject, body)
-    elif args.email_on_success:
-        # success condition, and we want to be notified
-        subject = "success: %s" % job_name
-        body = info_msg
-        mailer.send_email(subject, body)
+    cmd_info = {
+        "result": "success" if succeeded else "failure",
+        "name": args.name,
+        "desc": "%s\n\n" % args.desc if args.desc else "",
+        "cmd": args.cmd,
+        "run_time": cmd.run_time,
+        "return_code": cmd.return_code,
+        "hostname": socket.gethostname(),
+        "username": getpass.getuser(),
+        "outfile": args.stdout_path or '/dev/null',
+        "outfile_size": len(cmd.stdout),
+        "errfile": args.stderr_path or '/dev/null',
+        "errfile_size": len(cmd.stderr)
+    }
+    subject = SUBJECT_LINE_TMPL % cmd_info
+    body = STANDARD_MSG_TMPL % cmd_info
+    if args.include_stdout_in_email and cmd.stdout:
+        body += STDOUT_MSG_TMPL % _truncate(cmd.stdout)
+    if cmd.stderr:
+        body += ERROR_MSG_TMPL % _truncate(cmd.stderr, 100000)
+    mailer.send_email(subject, body)
 
 
 if __name__ == '__main__':
