@@ -155,10 +155,10 @@ def _go(args):
     }
     subject = SUBJECT_LINE_TMPL % cmd_info
     body = STANDARD_MSG_TMPL % cmd_info
-    if args.include_stdout_in_email and cmd.stdout:
-        body += STDOUT_MSG_TMPL % _truncate(cmd.stdout)
     if cmd.stderr:
         body += ERROR_MSG_TMPL % _truncate(cmd.stderr, 100000)
+    if args.include_stdout_in_email and cmd.stdout:
+        body += STDOUT_MSG_TMPL % _truncate(cmd.stdout)
     mailer.send_email(subject, body)
 
 
