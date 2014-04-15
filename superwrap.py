@@ -140,6 +140,10 @@ def _go(args):
         if (cmd.return_code != 0 or (not args.ignore_stderr and cmd.stderr)) \
         else True
 
+    if succeeded is True and args.email_on_success is False:
+        # success!  we're done
+        return
+
     mailer = Mailer(args.smtp_host, args.mail_from, args.mail_to, args.mail_subject_prefix, args.testing_email_mode)
     cmd_info = {
         "result": "success" if succeeded else "failure",
