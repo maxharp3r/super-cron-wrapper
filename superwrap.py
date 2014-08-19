@@ -118,8 +118,8 @@ class Mailer:
         if self.testing_mode:
             print msg
         else:
+            s = smtplib.SMTP(**self.smtp_args)
             try:
-                s = smtplib.SMTP(**self.smtp_args)
                 #s.set_debuglevel(True)
                 s.sendmail(self.from_addr, self.to_addrs, msg.as_string())
             finally:
